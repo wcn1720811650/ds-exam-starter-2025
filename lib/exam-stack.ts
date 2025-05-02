@@ -110,8 +110,15 @@ export class ExamStack extends cdk.Stack {
       receiveMessageWaitTime: cdk.Duration.seconds(5),
     });
     
-    // Connect Topic1 to QueueA
-    topic1.addSubscription(new subs.SqsSubscription(queueA));
+    // Connect Topic1 to QueueA with filter policy for Ireland and China only
+    topic1.addSubscription(new subs.SqsSubscription(queueA, {
+      filterPolicy: {
+        "address.country": sns.SubscriptionFilter.stringFilter({
+          allowlist: ["Ireland", "China"]
+        })
+      },
+      rawMessageDelivery: true
+    }));
     
     // Connect QueueA to QueueB (via Lambda X)
     const lambdaXFn = new lambdanode.NodejsFunction(this, "LambdaXFn", {
