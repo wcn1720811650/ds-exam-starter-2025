@@ -12,23 +12,32 @@ export const handler = async (event: SQSEvent): Promise<void> => {
       const message = record.body;
       console.log("Received message from Queue A:", message);
       
-      // Forward the message to Queue B
-      await sqs.sendMessage({
-        QueueUrl: process.env.QUEUE_B_URL || '',
-        MessageBody: message,
-        MessageAttributes: {
-          ProcessedBy: {
-            DataType: "String",
-            StringValue: "LambdaX"
-          },
-          Timestamp: {
-            DataType: "String",
-            StringValue: new Date().toISOString()
-          }
+      try {
+        const messageData = JSON.parse(message);
+        
+        if (!messageData.email) {
+          await sqs.sendMessage({
+            QueueUrl: process.env.QUEUE_B_URL || '',
+            MessageBody: message,
+            MessageAttributes: {
+              ProcessedBy: {
+                DataType: "String",
+                StringValue: "LambdaX"
+              },
+              Timestamp: {
+                DataType: "String",
+                StringValue: new Date().toISOString()
+              }
+            }
+          });
+          
+          console.log("Message forwarded to Queue B (missing email property)");
+        } else {
+          console.log("Message has email property, not forwarding to Queue B");
         }
-      });
-      
-      console.log("Message forwarded to Queue B");
+      } catch (parseError) {
+        console.error("Error parsing message:", parseError);
+      }
     }
   } catch (error) {
     console.error("Error processing messages:", error);
