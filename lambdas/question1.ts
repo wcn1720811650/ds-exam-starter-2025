@@ -20,6 +20,8 @@ export const handler: APIGatewayProxyHandlerV2 = async (event, context) => {
       if (path.match(/\/crew\/[^\/]+\/movies\/\d+$/)) {
         const role = pathParams.role;
         const movieId = parseInt(pathParams.movieId || '0');
+        const queryParams = event.queryStringParameters || {};
+        const verbose = queryParams.verbose === 'true';
         
         if (!role || isNaN(movieId)) {
           return {
@@ -29,25 +31,44 @@ export const handler: APIGatewayProxyHandlerV2 = async (event, context) => {
           };
         }
         
-        // Get crew member details from DynamoDB
-        const result = await client.send(new GetCommand({
-          TableName: process.env.TABLE_NAME,
-          Key: { movieId, role }
-        }));
-        
-        if (!result.Item) {
+        if (verbose) {
+          const result = await client.send(new QueryCommand({
+            TableName: process.env.TABLE_NAME,
+            KeyConditionExpression: "movieId = :movieId",
+            ExpressionAttributeValues: {
+              ":movieId": movieId
+            }
+          }));
+          
           return {
-            statusCode: 404,
+            statusCode: 200,
             headers: { "content-type": "application/json" },
-            body: JSON.stringify({ message: "Crew member not found" })
+            body: JSON.stringify({
+              requestedRole: role,
+              movieId: movieId,
+              allCrew: result.Items || []
+            })
+          };
+        } else {
+          const result = await client.send(new GetCommand({
+            TableName: process.env.TABLE_NAME,
+            Key: { movieId, role }
+          }));
+          
+          if (!result.Item) {
+            return {
+              statusCode: 404,
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ message: "Crew member not found" })
+            };
+          }
+          
+          return {
+            statusCode: 200,
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(result.Item)
           };
         }
-        
-        return {
-          statusCode: 200,
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify(result.Item)
-        };
       }
       
       // Handle /movies endpoint - Get all movies
