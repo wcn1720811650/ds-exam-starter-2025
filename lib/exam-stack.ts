@@ -97,18 +97,23 @@ export class ExamStack extends cdk.Stack {
       publicReadAccess: false,
     });
 
+    // Question 2 - Event-Driven architecture
     const topic1 = new sns.Topic(this, "Topic1", {
       displayName: "Exam topic",
+    });
+    
+    const queueA = new sqs.Queue(this, "QueueA", {
+      receiveMessageWaitTime: cdk.Duration.seconds(5),
     });
     
     const queueB = new sqs.Queue(this, "QueueB", {
       receiveMessageWaitTime: cdk.Duration.seconds(5),
     });
-
-    const queueA = new sqs.Queue(this, "queueA", {
-      receiveMessageWaitTime: cdk.Duration.seconds(5),
-    });
     
+    // Connect Topic1 to QueueA
+    topic1.addSubscription(new subs.SqsSubscription(queueA));
+    
+    // Connect QueueA to QueueB (via Lambda X)
     const lambdaXFn = new lambdanode.NodejsFunction(this, "LambdaXFn", {
       architecture: lambda.Architecture.ARM_64,
       runtime: lambda.Runtime.NODEJS_22_X,
@@ -117,9 +122,18 @@ export class ExamStack extends cdk.Stack {
       memorySize: 128,
       environment: {
         REGION: "eu-west-1",
+        QUEUE_B_URL: queueB.queueUrl,
       },
     });
-
+    
+    // Add SQS event source to Lambda X
+    lambdaXFn.addEventSource(new events.SqsEventSource(queueA, {
+      batchSize: 10,
+    }));
+    
+    // Grant Lambda X permissions to send messages to Queue B
+    queueB.grantSendMessages(lambdaXFn);
+    
     const lambdaYFn = new lambdanode.NodejsFunction(this, "LambdaYFn", {
       architecture: lambda.Architecture.ARM_64,
       runtime: lambda.Runtime.NODEJS_22_X,

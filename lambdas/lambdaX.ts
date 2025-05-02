@@ -1,10 +1,37 @@
-import { Handler } from "aws-lambda";
+import { SQSEvent } from "aws-lambda";
+import { SQS } from "@aws-sdk/client-sqs";
 
-export const handler: Handler = async (event, context) => {
+const sqs = new SQS({ region: process.env.REGION });
+
+export const handler = async (event: SQSEvent): Promise<void> => {
   try {
-    console.log("Event: ", JSON.stringify(event));
-
-  } catch (error: any) {
-    throw new Error(JSON.stringify(error));
+    console.log("Processing SQS event:", JSON.stringify(event));
+    
+    // Process each message from Queue A
+    for (const record of event.Records) {
+      const message = record.body;
+      console.log("Received message from Queue A:", message);
+      
+      // Forward the message to Queue B
+      await sqs.sendMessage({
+        QueueUrl: process.env.QUEUE_B_URL || '',
+        MessageBody: message,
+        MessageAttributes: {
+          ProcessedBy: {
+            DataType: "String",
+            StringValue: "LambdaX"
+          },
+          Timestamp: {
+            DataType: "String",
+            StringValue: new Date().toISOString()
+          }
+        }
+      });
+      
+      console.log("Message forwarded to Queue B");
+    }
+  } catch (error) {
+    console.error("Error processing messages:", error);
+    throw error;
   }
 };
