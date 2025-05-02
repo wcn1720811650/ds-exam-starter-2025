@@ -50,7 +50,7 @@ export class ExamStack extends cdk.Stack {
             [table.tableName]: generateBatch(movieCrew),
           },
         },
-        physicalResourceId: custom.PhysicalResourceId.of("moviesddbInitData"), //.of(Date.now().toString()),
+        physicalResourceId: custom.PhysicalResourceId.of("moviesddbInitData"),
       },
       policy: custom.AwsCustomResourcePolicy.fromSdkCalls({
         resources: [table.tableArn],
@@ -71,7 +71,22 @@ export class ExamStack extends cdk.Stack {
     });
 
     const anEndpoint = api.root.addResource("patha");
-
+    
+    const moviesResource = api.root.addResource("movies");
+    const singleMovieResource = moviesResource.addResource("{movieId}");
+    const roleResource = singleMovieResource.addResource("{role}");
+    
+    // add /crew/{role}/movies/{movieId} port
+    const crewResource = api.root.addResource("crew");
+    const crewRoleResource = crewResource.addResource("{role}");
+    const crewMoviesResource = crewRoleResource.addResource("movies");
+    const crewMovieIdResource = crewMoviesResource.addResource("{movieId}");
+    
+    // GET
+    crewMovieIdResource.addMethod("GET", new apig.LambdaIntegration(question1Fn));
+    
+    // GET
+    moviesResource.addMethod("GET", new apig.LambdaIntegration(question1Fn));
 
     // ==================================
     // Question 2 - Event-Driven architecture
@@ -115,6 +130,8 @@ export class ExamStack extends cdk.Stack {
         REGION: "eu-west-1",
       },
     });
+    
+    
     
   }
 }
